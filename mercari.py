@@ -17,6 +17,10 @@ from cryptography.hazmat.primitives.asymmetric import ec
 PRIVATE_KEY = ec.generate_private_key(ec.SECP256R1())
 PUBLIC_KEY = PRIVATE_KEY.public_key()
 
+MAX_ATTEMPTS = 4  # most people seem to use 3 retries so i decided i should go a step above the rest
+TIMEOUT = 1
+
+
 # so like a java record
 @dataclass(frozen=True)
 class Listing:
@@ -87,15 +91,26 @@ def make_valid_header(http_method: str, url: str) -> dict:
 
 
 def get_jpy_to_usd() -> float:
-    currency_url = 'https://api.mercari.jp/v2/getCurrencyConversionRate/currency'
-    jpy_to_usd_response = requests.get(currency_url, params={'currency_code': 'USD'},
-                                       headers=make_valid_header("GET", currency_url))
-    return jpy_to_usd_response.json()['rate']
+    url = 'https://api.mercari.jp/v2/getCurrencyConversionRate/currency'
+
+    last_exception = None
+    for attempt_nr in range(MAX_ATTEMPTS):
+        try:
+            response = requests.get(url, timeout=TIMEOUT, params={'currency_code': 'USD'},
+                                    headers=make_valid_header("GET", url))
+            response.raise_for_status()  # just "if status code is failure, throw exception"
+            return response.json()['rate']
+        except requests.exceptions.RequestException as e:
+            last_exception = e
+            if attempt_nr < MAX_ATTEMPTS - 1:
+                time.sleep(2 ** attempt_nr)
+
+    raise last_exception
 
 
 # get the ids of the 120 (or potentially less) results that would appear doing a normal search for the given term.
 # always sorts by newest, because that's the whole point.
-def get_ids_from_search(search: str) -> list[str] | None:
+def get_ids_from_search(search: str) -> list[str]:
     json_data = {
         'userId': '',
         'config': {
@@ -150,48 +165,59 @@ def get_ids_from_search(search: str) -> list[str] | None:
         'laplaceDeviceUuid': 'fa3a3ca3-e696-4d01-a2f5-49eb502e1c38',
     }
     url = "https://api.mercari.jp/v2/entities:search"
-    response = requests.post(url, json=json_data, headers=make_valid_header("POST", url))
 
-    if not response.ok:
-        print(response.status_code)
-        return None
+    last_exception = None
+    for attempt_nr in range(MAX_ATTEMPTS):
+        try:
+            response = requests.post(url, timeout=TIMEOUT, json=json_data, headers=make_valid_header("POST", url))
+            response.raise_for_status()  # just "if status code is failure, throw exception"
+            json = response.json()
+            ret = []
+            for item in json['items']:
+                ret.append(item['id'])
+            return ret
+        except requests.exceptions.RequestException as e:
+            last_exception = e
+            if attempt_nr < MAX_ATTEMPTS - 1:
+                time.sleep(2 ** attempt_nr)
 
-    json = response.json()
-    ret = []
-    for item in json['items']:
-        ret.append(item['id'])
-    return ret
+    raise last_exception
 
 
-def get_listing_from_id(id: str) -> Listing | None:
+def get_listing_from_id(id_: str) -> Listing:
     item_pattern = re.compile("m[0-9]{9,13}")
-    if item_pattern.match(id):
+    if item_pattern.match(id_):
         # i don't know what their engineers are cooking up here
-        url = "https://api.mercari.jp/items/get?id={0}&include_item_attributes=true&include_product_page_component=true&include_non_ui_item_attributes=true&include_donation=true&include_item_attributes_sections=true&include_auction=true".format(
-            id)
+        url = f"https://api.mercari.jp/items/get?id={id_}&include_item_attributes=true&include_product_page_component=true&include_non_ui_item_attributes=true&include_donation=true&include_item_attributes_sections=true&include_auction=true"
         item_type = "user"
     else:
         # i guess 'shops' is a newer feature so they got the tech-debtless API
-        url = "https://api.mercari.jp/v1/marketplaces/shops/products/{0}?view=FULL".format(id)
+        url = f"https://api.mercari.jp/v1/marketplaces/shops/products/{id_}?view=FULL"
         item_type = "shop"
 
-    response = requests.get(url, headers=make_valid_header("GET", url))
-    if not response.ok:
-        print(response.status_code)
-        return None
+    last_exception = None
+    for attempt_nr in range(MAX_ATTEMPTS):
+        try:
+            response = requests.get(url, timeout=TIMEOUT, headers=make_valid_header("GET", url))
+            response.raise_for_status()  # just "if status code is failure, throw exception"
+            json = response.json()
+            # the two apis have fairly different JSON structures
+            if item_type == "user":
+                return Listing(
+                    id=id_,
+                    title=json['data']['name'], description=json['data']['description'],
+                    price_jpy=float(json['data']['price']),
+                    url="https://buyee.jp/mercari/item/" + id_)
+            else:
+                return Listing(
+                    id=id_,
+                    title=json['displayName'],
+                    description=json['productDetail']['description'],
+                    price_jpy=float(json['price']),
+                    url="https://buyee.jp/mercari/item/" + id_)
+        except requests.exceptions.RequestException as e:
+            last_exception = e
+            if attempt_nr < MAX_ATTEMPTS - 1:
+                time.sleep(2 ** attempt_nr)
 
-    jason = response.json()
-    # the two apis have fairly different JSON structures? ok
-    if item_type == "user":
-        return Listing(
-            id=id,
-            title=jason['data']['name'], description=jason['data']['description'],
-            price_jpy=float(jason['data']['price']),
-            url="https://buyee.jp/mercari/item/" + id)
-    else:
-        return Listing(
-            id=id,
-            title=jason['displayName'],
-            description=jason['productDetail']['description'],
-            price_jpy=float(jason['price']),
-            url="https://buyee.jp/mercari/item/" + id)
+    raise last_exception

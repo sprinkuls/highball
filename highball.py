@@ -47,9 +47,6 @@ def startup():
             print(f"\"{search.search_name}\"'s results:")
             for term in search.search_terms:
                 ids = mercari.get_ids_from_search(term)
-                if ids is None:
-                    # TODO: put retry logic here
-                    raise Exception
                 print(term, "\tids:", ids[:3])
                 seen_ids.update(ids)
                 sleep(TIME_BETWEEN_REQUESTS)
@@ -75,7 +72,8 @@ def send_notification(listing: mercari.Listing, jpy_to_usd: float) -> None:
     requests.post(
         url,
         data=f"""new listing: {listing.title}
-              price: {listing.price_jpy * jpy_to_usd}""",
+              price: {listing.price_jpy * jpy_to_usd}
+              [link]({listing.url})""",
         headers={
             "Authorization": f"Bearer {token}",
             "Markdown": "yes"
@@ -127,8 +125,6 @@ def main():
                 logger.info(f"searching for: {search_term}")
 
                 sleep(TIME_BETWEEN_REQUESTS)
-                if ids is None:
-                    raise Exception  # TODO: put retry logic here
 
                 # need to check all the ids rather than, say, the ids up to the first duplicate. that should
                 # work in theory, but the issue is that sometimes when two items are added at almost the same time (or
@@ -148,9 +144,6 @@ def main():
             logger.info(f"getting listing page for id: {id_}")
             sleep(TIME_BETWEEN_REQUESTS)
 
-            if item_listing is None:
-                raise Exception  # TODO: put retry logic here
-
             if is_correct_item(item_listing):
                 new_items.append(item_listing)
                 print(item_listing.title, ":", item_listing.price_jpy, ":", item_listing.price_jpy * jpy_to_usd)
@@ -163,23 +156,59 @@ def main():
         for item in new_items:
             seen_ids.add(item.id)
             send_notification(item, jpy_to_usd)
+            sleep(TIME_BETWEEN_REQUESTS)
 
 
 if __name__ == '__main__':
     try:
+        # one time setup junk
         handler = logging.FileHandler("highball.log", mode="w", encoding="utf-8")
         formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s',
                                       datefmt='%Y-%m-%d %H:%M:%S')
         handler.setFormatter(formatter)
+
         logger.addHandler(handler)
+        logger.addHandler(logging.StreamHandler())  # ok this should print anything we log
+
         logger.setLevel(logging.DEBUG)
-
         logger.info('highball started')
-
         load_dotenv()
 
-        main()
+        # actually run the program
+        # TODO: this feels exceptionally hack
+        while True:
+            try:
+                main()
+            except requests.exceptions.RequestException as e:
+                logger.info(f"{e}\n")
+                print(f"{e}\n")
+                print("our builtin retries failed. time for the real retries.")
+
+                # effectively "restart" the program, write to disk and reset global state
+                shutdown()
+                seen_ids = set()
+                user_searches = []
+
+                max_retry_wait = 60
+                retry_nr = 0
+
+                # just keep retrying until we can connect
+                while True:
+                    try:
+                        response = requests.get(
+                            "https://jp.mercari.com/search?keyword=hhkb&sort=created_time&order=desc")
+                        response.raise_for_status()
+                        # if we get here, no connection error, and a good response code from mercari. so break and
+                        # we'll run main again
+                        break
+                    except requests.exceptions.RequestException as e:
+                        wait_time = min(2 ** retry_nr, max_retry_wait)
+                        print(f"failed to connect: {e}")
+                        print(f"retrying in {wait_time} seconds.")
+                        retry_nr += 1
+                        sleep(wait_time)
+
     except KeyboardInterrupt:
         shutdown()
-        logger.info('highball ^Closed (interrupt')
+        logger.info('highball ^Closed (keyboard interrupt')
         sys.exit(0)
