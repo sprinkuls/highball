@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>highball</title>
+    <link rel="stylesheet" href="/static/style.css">
+
+    {# my understanding here is that it doesn't really matter which you do, but you could probably argue that
+        the `url_for` one is better practice should you ever change what the static dir is #}
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    {#<link rel="shortcut icon" href="/static/favicon.ico">#}
+</head>
+
+<body>
+<header>
+    {# "set" doesn't refer to, like, the set data structure, it's for assignment (like "let" or "var") #}
+    {% set splash_messages = [
+        "the best website ever",
+        "a drink i've never tried",
+        "material goods"
+        ] %}
+
+    {# "apply the filter `random` to messages (i.e., pick a random element from messages)" #}
+    <h1>highball: {{ splash_messages | random }}</h1>
+</header>
+
+{# for `flash()` to work you have to actually, like, explicitly use it. makes sense #}
+{% for message in get_flashed_messages() %}
+    <div class="flash">{{ message }}</div>
+{% endfor %}
+
+<main>
+    {# where the stuff specific to a certain page goes #}
+    {% block my_dope_ass_swag %}
+    {% endblock %}
+</main>
+
+</body>
+</html>
