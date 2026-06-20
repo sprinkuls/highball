@@ -1,28 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <title>highball</title>
-    <link rel="stylesheet" href="/static/style.css">
-
-    {# my understanding here is that it doesn't really matter which you do, but you could probably argue that
-        the `url_for` one is better practice should you ever change what the static dir is #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    {#<link rel="shortcut icon" href="/static/favicon.ico">#}
+    <script src="{{ url_for('static', filename='htmx.min.js') }}"></script>
 </head>
 
 <body>
 <header>
     {# "set" doesn't refer to, like, the set data structure, it's for assignment (like "let" or "var") #}
-    {% set splash_messages = [
-        "the best website ever",
+    {% set splash_text = [
+        "the best site ever",
         "a drink i've never tried",
-        "material goods"
+        "for worldly possesions",
+        "because shit is serious"
         ] %}
 
     {# "apply the filter `random` to messages (i.e., pick a random element from messages)" #}
-    <h1>highball: {{ splash_messages | random }}</h1>
+    <h1>highball: {{ splash_text | random }}</h1>
+
+    {# this fucking rules #}
+    <p hx-get="/status_msg"
+       hx-trigger="load, every 1s"
+       hx-target="#status-msg"
+       hx-swap="textContent"
+    >Status: <span id="status-msg">loading...</span></p>
 </header>
 
 {# for `flash()` to work you have to actually, like, explicitly use it. makes sense #}
