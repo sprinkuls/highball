@@ -14,7 +14,7 @@
     {% set splash_text = [
         "the best program ever",
         "a drink i've never tried",
-        "for worldly possesions",
+        "for worldly possessions",
         "because shit is serious"
         ] %}
 
@@ -26,7 +26,14 @@
        hx-trigger="load, every 1s"
        hx-target="#status-msg"
        hx-swap="textContent"
-    >Status: <span id="status-msg">loading...</span></p>
+    >STATUS: <span id="status-msg">loading...</span></p>
+
+    <p hx-get="/exchange_rate"
+       hx-trigger="load, every 3600s"
+       hx-target="#exchange-rate"
+       hx-swap="textContent"
+    >EXCHANGE RATE: 1 USD = <span id="exchange-rate">?</span> JPY </p>
+
 </header>
 
 {# for `flash()` to work you have to actually, like, explicitly use it. makes sense #}
@@ -35,8 +42,8 @@
 {% endfor %}
 
 <main>
-    {# where the stuff specific to a certain page goes #}
     {% block my_dope_ass_swag %}
+        {# where the stuff specific to a certain page goes #}
     {% endblock %}
 </main>
 
