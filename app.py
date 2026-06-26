@@ -1,10 +1,11 @@
+import os
 import threading
 
 import flask
 from flask import Flask, send_file, render_template
 
 import background
-from search_model import Search
+from search_model import Search, SearchTerm
 
 app = Flask(__name__)
 
@@ -17,16 +18,6 @@ shared_state: dict = {
 }
 
 
-@app.route("/index.html")
-def index_dot_html():
-    return flask.redirect("/")
-
-
-@app.route("/")
-def index():
-    return render_template("index.html")
-
-
 @app.route("/favicon.ico")
 def favicon():
     return send_file("static/favicon.ico")
@@ -35,6 +26,45 @@ def favicon():
 @app.errorhandler(404)
 def page_not_found(error):
     return render_template("page_not_found.html")
+
+
+# ====================
+# PATHS! ENDPOINTS!
+# ====================
+
+@app.route("/")
+def index():
+    return flask.redirect("/searches")
+
+
+@app.route("/searches")
+def searches():
+    return render_template("index.html")
+
+
+@app.route("/searches", methods=["POST"])
+def add_search():
+    pass
+
+
+@app.route("/searches/<search_id>", methods=["DELETE"])
+def remove_search(search_id=0):
+    pass
+
+
+@app.route("/searches/<search_id>/terms", methods=["POST"])
+def add_term_to_search(search_id=0):
+    pass
+
+
+@app.route("/searches/<search_id>/terms", methods=["DELETE"])
+def remove_term_from_search(search_id=0):
+    pass
+
+
+@app.route("/searches/<search_id>/terms/<term_id>", methods=["DELETE"])
+def remove_term_from_search(search_id=0, term_id=0):
+    pass
 
 
 # ====================
@@ -54,21 +84,30 @@ def exchange_rate():
         return str(round(1 / shared_state["exchange_rate"], 2))
 
 
-def add_sample_data():
+def add_mock_data():
     Search.create_search("HHKB Pro 1", ["PD-KB300", "PD-KB300B", "PD-KB300NL", "PD-KB300BN"])
     Search.create_search("Sony BKE", ["BVE-2000", "BKE-2010", "BVE-900", "BKE-2011", "BVE-9100A"])
     Search.create_search("JDL", ["jdl eku", "EKUJ5", "EKUJ9", "EKUJ8"])
 
 
 if __name__ == "__main__":
-    t_background = threading.Thread(target=lambda: background.run(shared_state), daemon=True)
-    t_flask = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=1070, debug=False), daemon=True)
+    print("Hello, __main__!")
+    Search.init_db()
+    add_mock_data()
 
-    t_background.start()
-    t_flask.start()
+    mysearch = Search(1, "pro1", [SearchTerm(1, "pd-kb300"), SearchTerm(2, "pd-kb300nl")])
+    print(mysearch.id, mysearch.title)
+    for term in mysearch.search_terms:
+        print(term.term)
 
-    # uncomment this later
-    t_flask.join()
+    # t_background = threading.Thread(target=lambda: background.run(shared_state), daemon=True)
+    # t_flask = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=1070, debug=False), daemon=True)
+
+    # t_background.start()
+    # t_flask.start()
+
+    ## uncomment this later
+    # t_flask.join()
     # while True:
     #     print(f"Background Status: {shared_state["status_msg"]}")
     #     sleep(1)
