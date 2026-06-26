@@ -7,6 +7,9 @@ class SearchTerm:
         self.id = id_
         self.term = term
 
+    def __repr__(self):
+        return f"ST[id={self.id}, term=\"{self.term}\"]"
+
 
 class Search:
     database = 'searches.db'
@@ -16,6 +19,9 @@ class Search:
         self.title = title
         self.search_terms = search_terms
 
+    def __repr__(self):
+        return f"Search[id={self.id}, title=\"{self.title}\", search_terms={self.search_terms}]"
+
     @classmethod
     def init_db(cls):
         with closing(sqlite3.connect(cls.database)) as conn:
@@ -24,6 +30,7 @@ class Search:
                              "id    INTEGER PRIMARY KEY,"
                              "title TEXT    NOT NULL)")
                 conn.execute("CREATE TABLE IF NOT EXISTS search_terms("
+                             "id        INTEGER PRIMARY KEY,"
                              "search_id INTEGER REFERENCES searches(id) ON DELETE CASCADE,"
                              "term      TEXT    NOT NULL)")
                 conn.commit()
@@ -33,7 +40,7 @@ class Search:
     def create_search(cls, title: str, terms: list[str]):
         with closing(sqlite3.connect(cls.database)) as conn:
             with conn:
-                print("adding:", title, "with", terms)
+                # print(f'adding: "{title}" with terms: {terms}')
                 cursor = conn.execute("INSERT INTO searches(title) VALUES (?)", (title,))
                 search_id = cursor.lastrowid
                 for term in terms:
@@ -41,19 +48,39 @@ class Search:
 
     # READ
     @classmethod
-    def get_all_searches(cls) -> list[tuple[str, str]]:
+    def get_all_searches(cls) -> list["Search"]:
         with closing(sqlite3.connect(cls.database)) as conn:
             with conn:
+                # TODO: naive implementation
                 cursor = conn.execute("SELECT * FROM searches")
-                return cursor.fetchall()
+                ret_searches: dict[int, Search] = {}
+                for x in cursor.fetchall():
+                    ret_searches[x[0]] = Search(id_=x[0], title=x[1], search_terms=[])
+                for key in ret_searches:
+                    cursor = conn.execute("SELECT id, term FROM search_terms WHERE search_id = (?)",
+                                          (ret_searches[key].id,))
+                    for x in cursor.fetchall():
+                        ret_searches[key].search_terms.append(SearchTerm(id_=x[0], term=x[1]))
+
+                return list(ret_searches.values())
 
     # READ
     @classmethod
-    def get_search(cls, search_id: int) -> tuple[str, str] | None:
+    def get_search(cls, search_id: int) -> "Search | None":
         with closing(sqlite3.connect(cls.database)) as conn:
             with conn:
                 cursor = conn.execute("SELECT * FROM searches WHERE id = (?)", (search_id,))
-                return cursor.fetchone()
+                x = cursor.fetchone()
+                if x is None:
+                    return None
+                else:
+                    ret_search = Search(id_=x[0], title=x[1], search_terms=[])
+                    cursor = conn.execute("SELECT id, term FROM search_terms WHERE search_id = (?)",
+                                          (ret_search.id,))
+                    for x in cursor.fetchall():
+                        ret_search.search_terms.append(SearchTerm(id_=x[0], term=x[1]))
+
+                    return ret_search
 
     # DELETE
     @classmethod
