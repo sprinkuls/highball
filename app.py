@@ -1,4 +1,5 @@
 import os
+import sys
 import threading
 
 import flask
@@ -39,7 +40,7 @@ def index():
 
 @app.route("/searches")
 def searches():
-    return render_template("index.html")
+    return render_template("index.html", searches=Search.get_all_searches())
 
 
 @app.route("/searches", methods=["POST"])
@@ -54,11 +55,6 @@ def remove_search(search_id=0):
 
 @app.route("/searches/<search_id>/terms", methods=["POST"])
 def add_term_to_search(search_id=0):
-    pass
-
-
-@app.route("/searches/<search_id>/terms", methods=["DELETE"])
-def remove_term_from_search(search_id=0):
     pass
 
 
@@ -92,25 +88,48 @@ def add_mock_data():
 
 if __name__ == "__main__":
     print("Hello, __main__!")
-    Search.init_db()
-    add_mock_data()
 
-    mysearch = Search(1, "pro1", [SearchTerm(1, "pd-kb300"), SearchTerm(2, "pd-kb300nl")])
-    print(mysearch.id, mysearch.title)
-    for term in mysearch.search_terms:
-        print(term.term)
+    if len(sys.argv) == 2 and sys.argv[1] == "demo":
+        try:
+            os.remove("searches.db")
+        except OSError:
+            pass
 
-    # t_background = threading.Thread(target=lambda: background.run(shared_state), daemon=True)
-    # t_flask = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=1070, debug=False), daemon=True)
+        Search.init_db()
 
-    # t_background.start()
-    # t_flask.start()
+        print("adding mock data...")
+        add_mock_data()
 
-    ## uncomment this later
-    # t_flask.join()
-    # while True:
-    #     print(f"Background Status: {shared_state["status_msg"]}")
-    #     sleep(1)
+        print("current db contents:")
+        all_searches = Search.get_all_searches()
+        for x in all_searches:
+            print(x)
 
-    # you can also just do this if the web server is the last thing you need to run, i think:
-    # app.run(host="0.0.0.0", port=1070, debug=False)
+        test_id = 1
+        print(f"removing the search with id {test_id} from the db...")
+        if not Search.delete_search(test_id):
+            raise Exception
+
+        print("current db contents:")
+        all_searches = Search.get_all_searches()
+        for x in all_searches:
+            print(x)
+
+        print("getting search with id = 1...")
+        id_1 = Search.get_search(1)
+        print(id_1)
+
+    else:
+        try:
+            os.remove("searches.db")
+        except OSError:
+            pass
+
+        print("initializing db...")
+        Search.init_db()
+        print("adding mock data...")
+        add_mock_data()
+
+        print("starting background thread...")
+        threading.Thread(target=lambda: background.run(shared_state), daemon=True).start()
+        app.run(host="0.0.0.0", port=1070, debug=False)

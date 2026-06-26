@@ -1,5 +1,26 @@
-{% extends 'base.html' %}
+{% extends 'layout.html' %}
 
-{%  block my_dope_ass_swag  %}
-<h2>INDEX. PAGE.</h2>
+{% block my_dope_ass_swag %}
+    <h2>INDEX. PAGE.</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>search title</th>
+            <th>search terms</th>
+        </tr>
+        </thead>
+        <tbody>
+        {# and then here, there's a <tr> (table row) entry for each search #}
+        {% for search in searches %}
+            <tr>
+                <td>TITLE: {{ search.title }}</td>
+                <td>
+                    {% for st in search.search_terms %}
+                        <p>ID: {{ st.id }}, TERM: {{ st.term }}</p>
+                    {% endfor %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
 {% endblock %}
