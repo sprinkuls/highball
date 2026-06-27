@@ -35,18 +35,36 @@ class Search:
                              "term      TEXT    NOT NULL)")
                 conn.commit()
 
+    # ========================================
     # CREATE
+    # ========================================
+
     @classmethod
-    def create_search(cls, title: str, terms: list[str]):
+    def create_search(cls, title: str, terms: list[str]) -> int | None:
         with closing(sqlite3.connect(cls.database)) as conn:
             with conn:
-                # print(f'adding: "{title}" with terms: {terms}')
                 cursor = conn.execute("INSERT INTO searches(title) VALUES (?)", (title,))
                 search_id = cursor.lastrowid
+                # guard necessary here because we otherwise might try to insert None
+                if search_id is None:
+                    return None
+
                 for term in terms:
                     conn.execute("INSERT INTO search_terms(search_id, term) VALUES (?, ?)", (search_id, term))
 
+                return search_id
+
+    @classmethod
+    def create_search_term(cls, search_id: int, term: str) -> int | None:
+        with closing(sqlite3.connect(cls.database)) as conn:
+            with conn:
+                cursor = conn.execute("INSERT INTO search_terms(search_id, term) VALUES (?, ?)", (search_id, term))
+                return cursor.lastrowid
+
+    # ========================================
     # READ
+    # ========================================
+
     @classmethod
     def get_all_searches(cls) -> list["Search"]:
         with closing(sqlite3.connect(cls.database)) as conn:
@@ -64,7 +82,6 @@ class Search:
 
                 return list(ret_searches.values())
 
-    # READ
     @classmethod
     def get_search(cls, search_id: int) -> "Search | None":
         with closing(sqlite3.connect(cls.database)) as conn:
@@ -82,12 +99,43 @@ class Search:
 
                     return ret_search
 
+    # ========================================
+    # UPDATE
+    # ========================================
+
+    @classmethod
+    def update_search_title(cls, search_id: int, new_title: str) -> None:
+        with closing(sqlite3.connect(cls.database)) as conn:
+            with conn:
+                conn.execute("UPDATE searches SET title = (?) WHERE id = (?)", (new_title, search_id))
+
+    @classmethod
+    def update_search_term(cls, search_id: int, term_id: int, new_term: str) -> None:
+        with closing(sqlite3.connect(cls.database)) as conn:
+            with conn:
+                conn.execute("UPDATE search_terms SET term = (?) WHERE id = (?) and search_id = (?)",
+                             (new_term, term_id, search_id))
+
+    # ========================================
     # DELETE
+    # ========================================
+
     @classmethod
     def delete_search(cls, search_id: int) -> bool | None:
         with closing(sqlite3.connect(cls.database)) as conn:
             with conn:
                 cursor = conn.execute("DELETE FROM searches WHERE id = (?)", (search_id,))
+                if cursor.rowcount == 1:
+                    return True
+                else:
+                    return None
+
+    @classmethod
+    def delete_search_term(cls, search_id: int, term_id: int) -> bool | None:
+        with closing(sqlite3.connect(cls.database)) as conn:
+            with conn:
+                cursor = conn.execute("DELETE FROM search_terms WHERE id = (?) and search_id = (?)",
+                                      (term_id, search_id))
                 if cursor.rowcount == 1:
                     return True
                 else:

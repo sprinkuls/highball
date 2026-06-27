@@ -1,0 +1,13 @@
+{# you will need:  #}
+{# st: SearchTerm #}
+{# search_id: int #}
+<div class="search-term">
+    <input type="text" value="{{ st.term }}">
+
+    <button type="button"
+            hx-delete="/searches/{{ search_id }}/terms/{{ st.id }}"
+            hx-target="closest .search-term"
+            hx-swap="outerHTML"
+    >x
+    </button>
+</div>

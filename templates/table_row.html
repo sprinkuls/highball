@@ -1,0 +1,29 @@
+{# you will need: #}
+{# search: Search #}
+<tr>
+    <td>
+        <p>TITLE: {{ search.title }}</p>
+        <button type="button"
+                hx-delete="/searches/{{ search.id }}"
+                hx-target="closest tr"
+                hx-swap="outerHTML"
+                hx-confirm="are you sure you want to delete the search: {{ search.title }}?"
+        >
+            delete this search
+        </button>
+    </td>
+    <td>
+        {% for st in search.search_terms %}
+            {# kinda hack but necessary for the (lack of) information we have in the Flask "create" route #}
+            {% set search_id = search.id %}
+            {% include "term.html" %}
+        {% endfor %}
+
+        <button type="button"
+                hx-post="/searches/{{ search.id }}/terms"
+                hx-target="this"
+                hx-swap="beforebegin"
+        > add new search term
+        </button>
+    </td>
+</tr>

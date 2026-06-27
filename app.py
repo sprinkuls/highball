@@ -3,7 +3,7 @@ import sys
 import threading
 
 import flask
-from flask import Flask, send_file, render_template
+from flask import Flask, send_file, render_template, abort
 
 import background
 from search_model import Search, SearchTerm
@@ -26,7 +26,7 @@ def favicon():
 
 @app.errorhandler(404)
 def page_not_found(error):
-    return render_template("page_not_found.html")
+    return render_template("page_not_found.html"), 404
 
 
 # ====================
@@ -38,29 +38,64 @@ def index():
     return flask.redirect("/searches")
 
 
+# ====================
+
 @app.route("/searches")
 def searches():
     return render_template("index.html", searches=Search.get_all_searches())
 
 
+# ====================
+
 @app.route("/searches", methods=["POST"])
 def add_search():
+    new_id = Search.create_search("", [])
+    if new_id is None:
+        abort(500)
+    else:
+        return render_template("table_row.html", search=Search(new_id, "", []))
+
+
+@app.route("/searches/<search_id>", methods=["PATCH"])
+def rename_search(search_id=0):
     pass
 
 
 @app.route("/searches/<search_id>", methods=["DELETE"])
 def remove_search(search_id=0):
-    pass
+    ret = Search.delete_search(search_id)
+    if ret is None:
+        abort(404)
+    else:
+        return "", 200
 
+
+# ====================
 
 @app.route("/searches/<search_id>/terms", methods=["POST"])
 def add_term_to_search(search_id=0):
+    # need to return html for the new element that has the ID of the
+    new_id = Search.create_search_term(search_id, "")
+    if new_id is None:
+        abort(500)
+    else:
+        return render_template("term.html", st=SearchTerm(new_id, ""), search_id=search_id)
+
+
+# ====================
+
+@app.route("/searches/<search_id>/terms/<term_id>", methods=["PATCH"])
+def rename_search_term(search_id=0, term_id=0):
     pass
 
 
 @app.route("/searches/<search_id>/terms/<term_id>", methods=["DELETE"])
 def remove_term_from_search(search_id=0, term_id=0):
-    pass
+    ret = Search.delete_search_term(search_id, term_id)
+    if ret is None:
+        abort(404)
+    else:
+        return "", 200
 
 
 # ====================
@@ -81,8 +116,8 @@ def exchange_rate():
 
 
 def add_mock_data():
-    Search.create_search("HHKB Pro 1", ["PD-KB300", "PD-KB300B", "PD-KB300NL", "PD-KB300BN"])
     Search.create_search("Sony BKE", ["BVE-2000", "BKE-2010", "BVE-900", "BKE-2011", "BVE-9100A"])
+    Search.create_search("HHKB Pro 1", ["PD-KB300", "PD-KB300B", "PD-KB300NL", "PD-KB300BN"])
     Search.create_search("JDL", ["jdl eku", "EKUJ5", "EKUJ9", "EKUJ8"])
 
 
